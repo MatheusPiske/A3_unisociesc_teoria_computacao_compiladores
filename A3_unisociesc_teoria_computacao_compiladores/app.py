@@ -13,7 +13,7 @@ def lexical_analysis(code):
         (r'\b[a-zA-Z_]\w*(?=\s*=)', 'IDENTIFICADOR'),
         (r'[\+\-\*/\{\}\[\]=;]', 'OPERADOR'),
         (r'==|!=|<=|>=|<|>', 'COMPARACAO'),
-        (r'[\(\)]', 'DELIMITADOR'),
+        (r'[\(\)\{\}]', 'DELIMITADOR'),  # Added curly braces
         (r'"([^"]*)"', 'RETORNO'),
     ]
 
@@ -29,15 +29,22 @@ def check_parentheses_balance(tokens):
     stack = []
 
     for token, token_type in tokens:
-        if token_type == 'OPERADOR' and token in '()':
-            if token == '(':
+        if token_type == 'DELIMITADOR':
+            if token in '({':
                 stack.append(token)
-            elif token == ')':
-                if not stack or stack[-1] != '(':
-                    return False
+            elif token in ')}':
+                if not stack:
+                    return False, f"Erro sintático: Parênteses desbalanceados."
+                elif token == ')' and stack[-1] != '(':
+                    return False, f"Erro sintático: Parênteses desbalanceados."
+                elif token == '}' and stack[-1] != '{':
+                    return False, f"Erro sintático: Chaves desbalanceadas."
                 stack.pop()
 
-    return not stack
+    if stack:
+        return False, f"Erro sintático: Parênteses desbalanceados."
+
+    return True, None
 
 def semantic_analysis(tokens):
     errors = []
@@ -45,8 +52,6 @@ def semantic_analysis(tokens):
     for i in range(len(tokens) - 1):
         current_token, current_type = tokens[i]
         next_token, next_type = tokens[i + 1]
-        print(current_token + "atual")
-        print(next_token + "proximo")
 
         if current_type == 'OPERADOR' and current_token == '=':
             if next_type == 'OPERADOR' and next_token == '=':
@@ -69,15 +74,15 @@ def index():
         code = request.form["code"]
         result = lexical_analysis(code)
 
-        if not check_parentheses_balance(result):
-            error_message = "Erro sintático: Parênteses desbalanceados."
+        balanced, error_message = check_parentheses_balance(result)
+
+        if not balanced:
             return render_template("index.html", error_message=error_message)
 
         semantic_errors = semantic_analysis(result)
 
         if semantic_errors:
             return render_template("index.html", error_message=semantic_errors[0])
-
 
         display_symbol_table(result)
         symbol_table = result
